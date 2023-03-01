@@ -40,14 +40,16 @@ db.connect((err) => {
 //     });
 //   });
   //insert user
-  app.get("/adduser", (req, res) => {
-    let post = {  firstName: 'Lorena', lastName : "Vaidasigan",email: 'vaida.lorena@gamil.com', password :'1234',};
-    let sql = "INSERT INTO users SET ?";
-    let query = db.query(sql, post, (err, result) => {
-      if (err) throw err;
-      console.log("result");
-      res.send("User 1 added");
+  app.get("/users", (req, res) => {
+    const q = "SELECT * FROM users";
+    db.query(q, (err, data) => {
+      if (err) {
+        console.log(err);
+        return res.json(err);
+      }
+      return res.json(data);
     });
   });
+
  
-app.listen("3000");
+app.listen("5000");
