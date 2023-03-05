@@ -8,7 +8,7 @@ const db = mysql.createConnection({
   host: "localhost",
   user: "root",
   password: "",
-  database: 'bank-of-time-database'
+  database: "bank-of-time-database",
 });
 
 // conectare baze de date
@@ -16,10 +16,9 @@ db.connect((err) => {
   if (err) {
     throw err;
   }
-  
 });
 
- //creez db
+//creez db
 // app.get("/createbd",(req,res)=> {
 //     let sql="CREATE DATABASE bank-of-time-database"
 //     db.query(sql,(err,result)=>{
@@ -28,7 +27,7 @@ db.connect((err) => {
 //         res.send("Baza de date este creata!");
 //     });
 //     });
-    
+
 // creez tabele
 // app.get("/login", (req, res) => {
 //     let sql =
@@ -39,17 +38,21 @@ db.connect((err) => {
 //       res.send("Users table crated");
 //     });
 //   });
-  //insert user
-  app.get("/users", (req, res) => {
-    const q = "SELECT * FROM users";
-    db.query(q, (err, data) => {
-      if (err) {
-        console.log(err);
-        return res.json(err);
-      }
-      return res.json(data);
-    });
+//insert user
+app.get("/users", (req, res) => {
+  const q = "SELECT * FROM users";
+  db.query(q, (err, data) => {
+    if (err) {
+      console.log(err);
+      return res.json(err);
+    }
+    return res.json(data);
   });
+});
 
- 
+app.all('*', (req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "https://localhost:3000");
+  next();
+});
+
 app.listen("5000");
