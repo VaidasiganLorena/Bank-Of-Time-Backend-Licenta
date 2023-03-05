@@ -1,8 +1,10 @@
 const express = require("express");
 const mysql = require("mysql");
-
+const cors = require('cors')
 const app = express();
 
+ app.use(express.urlencoded({extended: true}))
+ app.use(cors())
 //conexiunea
 const db = mysql.createConnection({
   host: "localhost",
@@ -39,7 +41,7 @@ db.connect((err) => {
 //     });
 //   });
 //insert user
-app.get("/users", (req, res) => {
+app.get("/users",cors,async (req, res) => {
   const q = "SELECT * FROM users";
   db.query(q, (err, data) => {
     if (err) {
@@ -50,9 +52,5 @@ app.get("/users", (req, res) => {
   });
 });
 
-app.all('*', (req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "https://localhost:3000");
-  next();
-});
 
 app.listen("5000");
