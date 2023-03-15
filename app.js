@@ -30,17 +30,6 @@ const generateAccessToken = (email) => {
   })
 }
 
-app.get('/user', (req, res) => {
-  const bank_of_time = db
-  bank_of_time.execute(`SELECT * FROM users `, (dbErr, dbRes) => {
-    if (dbErr) {
-      res.status(400).send({ response: dbErr.message, status: 400 }).end()
-    }
-    if (dbRes) {
-      res.status(200).send({ response: dbRes, status: 200 })
-    }
-  })
-})
 app.post(
   '/user/login',
   body('email').isEmail().normalizeEmail(),
@@ -97,6 +86,59 @@ app.post(
     }
   },
 )
+app.get('/user/:uuid', (req, res) => {
+  const bank_of_time = db
+  let tokenValid = true
+  // jwt.verify(req.headers.authtoken, process.env.SECRET_TOKEN, (err, decoded) => {
+  //   if (err) {
+  //     res.status(400).send({ response: 'Token invalid/expired!', status: 400 }).end()
+  //   }
+  //   if (decoded) {
+  //     req.tokenData = decoded
+  //     tokenValid = true
+  //   }
+  // })
+  if (tokenValid) {
+    const userUuid = req.params.uuid
+    bank_of_time.execute(`SELECT * FROM users WHERE userUuid = '${userUuid}'`, (dbErr, dbRes) => {
+      if (dbErr) {
+        res.status(400).send({ response: dbErr.message, status: 400 }).end()
+      }
+      if (dbRes) {
+        res.status(200).send({ response: dbRes, status: 200 }).end()
+      }
+    })
+  }
+})
+app.put('/user/update/:uuid', (req, res) => {
+  const bank_of_time = db
+  let tokenValid = true
+  // jwt.verify(req.headers.authtoken, process.env.SECRET_TOKEN, (err, decoded) => {
+  //   if (err) {
+  //     res.status(400).send({ response: 'Token invalid/expired!', status: 400 }).end()
+  //   }
+  //   if (decoded) {
+  //     req.tokenData = decoded
+  //     tokenValid = true
+  //   }
+  // })
+  if (tokenValid) {
+    const userUuid = req.params.uuid
+    let fieldForUpdate = []
+    Object.keys(req.body).map((key) => {
+      fieldForUpdate.push(' ' + key + '=' + "'" + req.body[key] + "'")
+    })
+    const persoQuery = `UPDATE users SET` + fieldForUpdate.join() + `WHERE userUuid = '${userUuid}'`
+    bank_of_time.execute(persoQuery, (dbErr, dbRes) => {
+      if (dbErr) {
+        res.status(400).send({ response: dbErr.message, status: 400 }).end()
+      }
+      if (dbRes) {
+        res.status(200).send({ response: 'User updated with success!', status: 200 }).end()
+      }
+    })
+  }
+})
 app.post(
   '/user/register',
   body('firstName').isLength({ min: 1 }),
