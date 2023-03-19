@@ -186,4 +186,16 @@ app.post(
     }
   },
 ),
-  app.listen('3306')
+  app.get('/gainers', (req, res) => {
+    const bank_of_time = db
+
+    bank_of_time.execute(`SELECT * FROM gainers`, (dbErr, dbRes) => {
+      if (dbErr) {
+        res.status(400).send({ response: dbErr.message, status: 400 }).end()
+      }
+      if (dbRes) {
+        res.status(200).send({ response: dbRes, status: 200 }).end()
+      }
+    })
+  })
+app.listen('3306')
