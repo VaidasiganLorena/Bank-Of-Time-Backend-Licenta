@@ -122,15 +122,15 @@ app.get('/user/:uuid', (req, res) => {
 app.put('/user/update/:uuid', (req, res) => {
   const bank_of_time = db
   let tokenValid = true
-  jwt.verify(req.headers.authtoken, process.env.SECRET_TOKEN, (err, decoded) => {
-    if (err) {
-      res.status(400).send({ response: 'Token invalid/expired!', status: 400 }).end()
-    }
-    if (decoded) {
-      req.tokenData = decoded
-      tokenValid = true
-    }
-  })
+  // jwt.verify(req.headers.authtoken, 'fIb4H7blh0TH4qvrKMZAcWnFVC7FEW00dxb5yBrO', (err, decoded) => {
+  //   if (err) {
+  //     return res.status(400).send({ response: 'Token invalid/expired!', status: 400 }).end()
+  //   }
+  //   if (decoded) {
+  //     req.tokenData = decoded
+  //     tokenValid = true
+  //   }
+  // })
   if (tokenValid) {
     const userUuid = req.params.uuid
     let fieldForUpdate = []
@@ -140,10 +140,10 @@ app.put('/user/update/:uuid', (req, res) => {
     const persoQuery = `UPDATE users SET` + fieldForUpdate.join() + `WHERE userUuid = '${userUuid}'`
     bank_of_time.execute(persoQuery, (dbErr, dbRes) => {
       if (dbErr) {
-        res.status(400).send({ response: dbErr.message, status: 400 }).end()
+        return res.status(400).send({ response: dbErr.message, status: 400 }).end()
       }
       if (dbRes) {
-        res.status(200).send({ response: 'User updated with success!', status: 200 }).end()
+        return res.status(200).send({ response: 'User updated with success!', status: 200 }).end()
       }
     })
   }
@@ -157,6 +157,7 @@ app.post(
   body('password').isLength({ min: 1 }),
   body('city').isLength({ min: 1 }),
   body('gender').isLength({ min: 1 }),
+  body('photo').isLength({ min: 1 }),
   (req, res) => {
     const errors = validationResult(req)
     if (!errors.isEmpty()) {
@@ -170,24 +171,25 @@ app.post(
         password: req.body.password,
         city: req.body.city,
         gender: req.body.gender,
+        photo: req.body.photo,
       }
-
-      console.log(userInformation)
 
       const bank_of_time = db
       const hashedPw = bcrypt.hashSync(userInformation.password, 10)
       if (hashedPw) {
         bank_of_time.execute(
-          `INSERT INTO users (firstname, lastname, email, phoneNumber, password, city, gender, userUuid) VALUES (
+          `INSERT INTO users (firstname, lastname, email, phoneNumber, password, city, gender, userUuid, photo) VALUES (
       '${userInformation.firstname}','${userInformation.lastname}','${userInformation.email}' ,'${userInformation.phoneNumber}', '${hashedPw}' ,
-      '${userInformation.city}','${userInformation.gender}', uuid());`,
+      '${userInformation.city}','${userInformation.gender}', uuid(),'${userInformation.photo}');`,
           (dbErr, dbRes) => {
             if (dbErr) {
-              res.status(400).send({ response: dbErr.message, status: 400 }).end()
+              return res.status(400).send({ response: dbErr.message, status: 400 }).end()
             }
             if (dbRes) {
-              console.log(dbRes)
-              res.status(200).send({ response: 'User created with success!', status: 200 }).end()
+              return res
+                .status(200)
+                .send({ response: 'User created with success!', status: 200 })
+                .end()
             }
           },
         )
@@ -210,7 +212,6 @@ app.post(
   })
 app.get('/gainers/filter', (req, res) => {
   const bank_of_time = db
-
   const filters = (({ helpTypeUuid, city }) => ({
     helpTypeUuid,
     city,
@@ -235,6 +236,24 @@ app.get('/gainers/filter', (req, res) => {
       status: 200,
       count: filteredGainers.length,
     })
+    bank_of_time.end()
+    return null
   })
+})
+app.delete('/user/:uuid', (req, res) => {
+  let tokenValid = true
+
+  if (tokenValid) {
+    const bank_of_time = db
+    const userUuid = req.params.uuid
+    bank_of_time.execute(`DELETE FROM users WHERE userUuid='${userUuid}'`, (dbErr, dbRes) => {
+      if (dbErr) {
+        return res.status(400).send({ response: dbErr.message, status: 400 }).end()
+      }
+      if (dbRes) {
+        return res.status(200).send({ response: 'User deleted with succes!', status: 200 }).end()
+      }
+    })
+  }
 })
 app.listen('3306')
