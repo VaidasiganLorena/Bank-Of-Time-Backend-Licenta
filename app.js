@@ -256,4 +256,42 @@ app.delete('/user/:uuid', (req, res) => {
     })
   }
 })
+app.put('/user/change-password/:uuid', (req, res) => {
+  let tokenValid = true
+
+  if (tokenValid) {
+    const bank_of_time = db
+    let tokenValid = true
+    // jwt.verify(req.headers.authtoken, 'fIb4H7blh0TH4qvrKMZAcWnFVC7FEW00dxb5yBrO', (err, decoded) => {
+    //   if (err) {
+    //     return res.status(400).send({ response: 'Token invalid/expired!', status: 400 }).end()
+    //   }
+    //   if (decoded) {
+    //     req.tokenData = decoded
+    //     tokenValid = true
+    //   }
+    // })
+
+    const userUuid = req.params.uuid
+    let fieldForUpdate = []
+
+    Object.keys(req.body).map((key) => {
+      fieldForUpdate.push(' ' + key + '=' + "'" + bcrypt.hashSync(req.body[key], 10) + "'")
+    })
+
+    const persoQuery = `UPDATE users SET` + fieldForUpdate.join() + `WHERE userUuid = '${userUuid}'`
+    bank_of_time.execute(persoQuery, (dbErr, dbRes) => {
+      if (dbErr) {
+        return res.status(400).send({ response: dbErr.message, status: 400 }).end()
+      }
+      if (dbRes) {
+        return res
+          .status(200)
+          .send({ response: 'Password change with success!', status: 200 })
+          .end()
+      }
+    })
+  }
+})
+
 app.listen('3306')
