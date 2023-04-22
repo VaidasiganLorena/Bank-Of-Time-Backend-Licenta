@@ -5,6 +5,7 @@ import bodyParser from 'body-parser'
 import { body, validationResult } from 'express-validator'
 import cors from 'cors'
 import jwt from 'jsonwebtoken'
+import console from 'console'
 
 const app = express()
 app.use(
@@ -222,7 +223,6 @@ app.get('/gainers/filter', (req, res) => {
   bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
     if (dbErr) {
       res.status(400).send({ response: 'Error while reading', status: 400 }).end()
-      console.log(dbErr)
     }
     let filteredGainers = dbRes.filter((gainer) => {
       let isValid = true
@@ -289,6 +289,102 @@ app.put('/user/change-password/:uuid', (req, res) => {
           .status(200)
           .send({ response: 'Password change with success!', status: 200 })
           .end()
+      }
+    })
+  }
+})
+//appointemts
+
+const updateListOfDates = () => {
+  const bank_of_time = db
+  const userUuid = req.params.uuid
+  bank_of_time.execute(`SELECT * FROM users WHERE userUuid = '${userUuid}'`, (dbErr, dbRes) => {
+    if (dbErr) {
+      res.status(400).send({ response: dbErr.message, status: 400 }).end()
+    }
+    if (dbRes) {
+      console.log(dbRes)
+      res.status(200).send({ response: dbRes, status: 200 }).end()
+    }
+  })
+}
+app.get('/aaa/:uuid/:app', (req, res) => {
+  const bank_of_time = db
+  const gainerUuid = req.params.uuid
+  const appointment = req.params.app
+  console.log(appointment)
+  bank_of_time.execute(
+    `SELECT listOfDates FROM gainers WHERE gainerUuid = '${gainerUuid}'`,
+    (dbErr, dbRes) => {
+      if (dbRes) {
+        const aa = dbRes[0].listOfDates
+        console.log(aa)
+        const removeDate = aa.replace(appointment.concat(','), '')
+        console.log(removeDate)
+        //dbRes[0].listOfDates.map((item) => console.log(item))
+        // res.status(200).send({ response: dbRes, status: 200 }).end()
+      }
+    },
+  )
+})
+app.post(
+  '/appointment',
+  body('userUuid').isLength({ min: 1 }),
+  body('gainerUuid').isLength({ min: 1 }),
+  body('dateOfAppointment').isLength({ min: 1 }),
+  body('status').isLength({ min: 1 }),
+  (req, res) => {
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) {
+      return res.status(400).send(errors).end()
+    } else {
+      const appointment = {
+        userUuid: req.body.userUuid,
+        gainerUuid: req.body.gainerUuid,
+        dateOfAppointment: req.body.dateOfAppointment,
+        status: req.body.status,
+      }
+
+      const bank_of_time = db
+      //updateListOfDates()
+      bank_of_time.execute(`UPDATE gainers SET listOfDates WHERE gainerUuid = '${gainerUuid}'`)
+      bank_of_time.execute(
+        `INSERT INTO appointments ( userUuid, gainerUuid, dateOfAppointment, status) VALUES (
+      '${appointment.userUuid}','${appointment.gainerUuid}','${appointment.dateOfAppointment}' ,'${appointment.status}');`,
+        (dbErr, dbRes) => {
+          if (dbErr) {
+            return res.status(400).send({ response: dbErr.message, status: 400 }).end()
+          }
+          if (dbRes) {
+            return res.status(200).send({ response: 'Programare înregistrată!', status: 200 }).end()
+          }
+        },
+      )
+    }
+  },
+)
+app.get('/appointment/:uuid', (req, res) => {
+  const bank_of_time = db
+  let tokenValid = true
+  // jwt.verify(req.headers.authtoken, process.env.SECRET_TOKEN, (err, decoded) => {
+  //   if (err) {
+  //     res.status(400).send({ response: 'Token invalid/expired!', status: 400 }).end()
+  //   }
+  //   if (decoded) {
+  //     req.tokenData = decoded
+  //     tokenValid = true
+  //   }
+  // })
+
+  if (tokenValid) {
+    const userUuid = req.params.uuid
+    const querySelectGainers = `SELECT * FROM gainers LEFT OUTER JOIN appointments ON appointments.gainerUuid = gainers.gainerUuid WHERE appointments.gainerUuid = gainers.gainerUuid AND userUuid = '${userUuid}' ORDER BY dateOfAppointment DESC;`
+    bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
+      if (dbErr) {
+        res.status(400).send({ response: dbErr.message, status: 400 }).end()
+      }
+      if (dbRes) {
+        res.status(200).send({ response: dbRes, status: 200 }).end()
       }
     })
   }
