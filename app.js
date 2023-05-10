@@ -1,4 +1,4 @@
-import express from 'express'
+import express, { response } from 'express'
 import mysql from 'mysql2'
 import bcrypt from 'bcryptjs'
 import bodyParser from 'body-parser'
@@ -6,6 +6,7 @@ import { body, validationResult } from 'express-validator'
 import cors from 'cors'
 import jwt from 'jsonwebtoken'
 import console from 'console'
+import nodemailer from 'nodemailer'
 
 const app = express()
 app.use(
@@ -200,6 +201,7 @@ app.post(
 ),
   app.get('/gainers', (req, res) => {
     const bank_of_time = db
+
     const querySelectGainers =
       'SELECT `gainers`.* ,`helpTypes`.* FROM `helpTypes` LEFT JOIN `gainers` ON `gainers`.`helpTypeUuid` = `helpTypes`.`helpTypeUuid` WHERE `gainers`.`helpTypeUuid`= `helpTypes`.`helpTypeUuid`;'
     bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
@@ -211,6 +213,7 @@ app.post(
       }
     })
   })
+
 app.get('/gainers/filter', (req, res) => {
   const bank_of_time = db
   const filters = (({ helpTypeUuid, city }) => ({
@@ -333,6 +336,7 @@ app.post(
   body('gainerUuid').isLength({ min: 1 }),
   body('dateOfAppointment').isLength({ min: 1 }),
   body('status').isLength({ min: 1 }),
+  body('timeVolunteering'),
   (req, res) => {
     const errors = validationResult(req)
     if (!errors.isEmpty()) {
@@ -343,14 +347,15 @@ app.post(
         gainerUuid: req.body.gainerUuid,
         dateOfAppointment: req.body.dateOfAppointment,
         status: req.body.status,
+        timeVolunteering: req.body.timeVolunteering,
       }
-
+      console.log(appointment)
       const bank_of_time = db
       //updateListOfDates()
-      bank_of_time.execute(`UPDATE gainers SET listOfDates WHERE gainerUuid = '${gainerUuid}'`)
+      // bank_of_time.execute(`UPDATE gainers SET listOfDates WHERE gainerUuid = '${gainerUuid}'`)
       bank_of_time.execute(
-        `INSERT INTO appointments ( userUuid, gainerUuid, dateOfAppointment, status) VALUES (
-      '${appointment.userUuid}','${appointment.gainerUuid}','${appointment.dateOfAppointment}' ,'${appointment.status}');`,
+        `INSERT INTO appointments ( userUuid, gainerUuid, dateOfAppointment, status, timeVolunteering) VALUES (
+      '${appointment.userUuid}','${appointment.gainerUuid}','${appointment.dateOfAppointment}' ,'${appointment.status}','${appointment.timeVolunteering}');`,
         (dbErr, dbRes) => {
           if (dbErr) {
             return res.status(400).send({ response: dbErr.message, status: 400 }).end()
@@ -380,14 +385,70 @@ app.get('/appointment/:uuid', (req, res) => {
     const userUuid = req.params.uuid
     const querySelectGainers = `SELECT * FROM gainers LEFT OUTER JOIN appointments ON appointments.gainerUuid = gainers.gainerUuid WHERE appointments.gainerUuid = gainers.gainerUuid AND userUuid = '${userUuid}' ORDER BY dateOfAppointment DESC;`
     bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
-      if (dbErr) {
-        res.status(400).send({ response: dbErr.message, status: 400 }).end()
-      }
       if (dbRes) {
         res.status(200).send({ response: dbRes, status: 200 }).end()
+      }
+      if (dbErr) {
+        res.status(400).send({ response: dbErr.message, status: 400 }).end()
       }
     })
   }
 })
+app.get('/appointments', (req, res) => {
+  const bank_of_time = db
+  bank_of_time.execute(
+    `SELECT COUNT(*) As numberPendingCards FROM appointments WHERE status= 'În așteptare';`,
+    (dbErr, dbRes) => {
+      const numberPendingCards = dbRes[0].numberPendingCards
+      const queryAppoiments = `SELECT * FROM gainers LEFT OUTER JOIN appointments ON appointments.gainerUuid = gainers.gainerUuid LEFT OUTER JOIN users ON users.userUuid = appointments.userUuid ;`
+      bank_of_time.execute(queryAppoiments, (dbErr, dbRes) => {
+        if (dbErr) {
+          res.status(400).send({ response: dbErr.message, status: 400 }).end()
+        }
+        if (dbRes) {
+          res
+            .status(200)
+            .send({ response: dbRes, numberPendingCards: numberPendingCards, status: 200 })
+            .end()
+        }
+      })
+    },
+  )
+})
+app.post(
+  '/mailAppointment',
+  body('emailTo').isLength({ min: 1 }),
+  body('firstName').isLength({ min: 1 }),
+  body('nameGainer').isLength({ min: 1 }),
+  body('adress').isLength({ min: 1 }),
+  body('cityGainer').isLength({ min: 1 }),
+  body('dateOfAppointment').isLength({ min: 1 }),
+
+  (req, res) => {
+    const transporter = nodemailer.createTransport({
+      port: 587,
+      host: 'smtp.gmail.com',
+      auth: {
+        user: 'bankoftimero@gmail.com',
+        pass: 'mscjfohfuephgsia',
+      },
+      secure: false,
+    })
+    const mailData = {
+      from: 'bankoftimero@gmail.com',
+      to: 'vaida.lorena1702@gmail.com',
+      subject: `Aici se află programarea ta, de pe Banca Timpului!`,
+      text: `Programarea!`,
+      html: `<b>Bună, ${req.body.firstName}!</b><br>Ati ales sa ajutati pe domnul/doamna <b>${req.body.nameGainer}</b> in data de ${req.body.dateOfAppointment}.</br><br>Aici este adresa <b>${req.body.adress} ${req.body.cityGainer}</b> unde trebuie sa mergeti. </br>`,
+    }
+    transporter.sendMail(mailData, (err, res) => {
+      if (err) {
+        return console.log(err)
+      }
+
+      res.status(200).send({ message: 'Mailul a fost trimis!' })
+    })
+  },
+)
 
 app.listen('3306')
