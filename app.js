@@ -7,6 +7,7 @@ import cors from 'cors'
 import jwt from 'jsonwebtoken'
 import console from 'console'
 import nodemailer from 'nodemailer'
+import { stringify } from 'querystring'
 
 const app = express()
 app.use(
@@ -48,7 +49,7 @@ app.post(
       }
       const bank_of_time = db
       bank_of_time.execute(
-        `SELECT userUuid, email, password FROM users WHERE email = '${userLoginInfo.email}'`,
+        `SELECT userUuid, email, password, role FROM users WHERE email = '${userLoginInfo.email}'`,
         (dbErr, dbRes) => {
           if (dbErr) {
             res.status(401).send({ response: dbErr.message, status: 401 }).end()
@@ -62,15 +63,6 @@ app.post(
 
               return
             } else {
-              if (dbRes[0].email.includes('@bankoftime.ro') === true) {
-                res.status(200).send({
-                  response: {
-                    userUuid: dbRes[0].userUuid,
-                    role: 'admin',
-                  },
-                  status: 200,
-                })
-              }
               if (bcrypt.compareSync(userLoginInfo.password, dbRes[0].password)) {
                 const authToken = generateAccessToken(dbRes[0].email)
 
@@ -80,8 +72,8 @@ app.post(
                     response: {
                       userUuid: dbRes[0].userUuid,
                       authToken: authToken,
+                      role: dbRes[0].role,
                     },
-                    status: 200,
                   })
                   .end()
               } else {
@@ -145,7 +137,10 @@ app.put('/user/update/:uuid', (req, res) => {
         return res.status(400).send({ response: dbErr.message, status: 400 }).end()
       }
       if (dbRes) {
-        return res.status(200).send({ response: 'User updated with success!', status: 200 }).end()
+        return res
+          .status(200)
+          .send({ response: 'Utilizatorul a fost actualizat cu succes!', status: 200 })
+          .end()
       }
     })
   }
@@ -190,7 +185,7 @@ app.post(
             if (dbRes) {
               return res
                 .status(200)
-                .send({ response: 'User created with success!', status: 200 })
+                .send({ response: 'Utilizatorul a fost creat cu succes!', status: 200 })
                 .end()
             }
           },
@@ -214,35 +209,85 @@ app.post(
     })
   })
 
-app.get('/gainers/filter', (req, res) => {
-  const bank_of_time = db
-  const filters = (({ helpTypeUuid, city }) => ({
-    helpTypeUuid,
-    city,
-  }))(req.query)
-  const querySelectGainers =
-    'SELECT `gainers`.* ,`helpTypes`.* FROM `helpTypes` LEFT JOIN `gainers` ON `gainers`.`helpTypeUuid` = `helpTypes`.`helpTypeUuid` WHERE `gainers`.`helpTypeUuid`= `helpTypes`.`helpTypeUuid`;'
+app.post(
+  '/newgainer',
+  body('nameGainer').isLength({ min: 1 }),
+  body('dateOfBirth'),
+  body('phoneNumberGainer').isLength({ min: 1 }),
+  body('adress').isLength({ min: 1 }),
+  body('cityGainer').isLength({ min: 1 }),
+  body('gender').isLength({ min: 1 }),
+  body('photoGainer').isLength({ min: 1 }),
+  body('listOfDates').isLength({ min: 1 }),
+  body('description').isLength({ min: 1 }),
+  body('helpTypeUuid').isLength({ min: 1 }),
 
-  bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
-    if (dbErr) {
-      res.status(400).send({ response: 'Error while reading', status: 400 }).end()
-    }
-    let filteredGainers = dbRes.filter((gainer) => {
-      let isValid = true
-      for (let key in filters) {
-        filters[key] ? (isValid = isValid && gainer[key] == filters[key]) : null
+  (req, res) => {
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) {
+      return res.status(400).send(errors).end()
+    } else {
+      const gainerInformation = {
+        nameGainer: req.body.nameGainer,
+        dateOfBirth: req.body.dateOfBirth,
+        phoneNumberGainer: req.body.phoneNumberGainer,
+        adress: req.body.adress,
+        cityGainer: req.body.cityGainer,
+        gender: req.body.gender,
+        photoGainer: req.body.photoGainer,
+        listOfDates: req.body.listOfDates,
+        description: req.body.description,
+        helpTypeUuid: req.body.helpTypeUuid,
       }
-      return isValid
+
+      const bank_of_time = db
+      bank_of_time.execute(
+        `INSERT INTO  gainers (nameGainer, cityGainer, dateOfBirth, phoneNumberGainer, adress, gender, gainerUuid, description, helpTypeUuid, listOfDates, photoGainer ) VALUES (
+        '${gainerInformation.nameGainer}','${gainerInformation.cityGainer}','${gainerInformation.dateOfBirth}','${gainerInformation.phoneNumberGainer}','${gainerInformation.adress}','${gainerInformation.gender}',uuid(),'${gainerInformation.description}','${gainerInformation.helpTypeUuid}','${gainerInformation.listOfDates}','${gainerInformation.photoGainer}');`,
+        (dbErr, dbRes) => {
+          if (dbErr) {
+            return res.status(400).send({ response: dbErr.message, status: 400 }).end()
+          }
+          if (dbRes) {
+            return res
+              .status(200)
+              .send({ response: 'Beneficiarul a fost adăugat cu succes!', status: 200 })
+              .end()
+          }
+        },
+      )
+    }
+  },
+),
+  app.get('/gainers/filter', (req, res) => {
+    const bank_of_time = db
+    const filters = (({ helpTypeUuid, city }) => ({
+      helpTypeUuid,
+      city,
+    }))(req.query)
+    const querySelectGainers =
+      'SELECT `gainers`.* ,`helpTypes`.* FROM `helpTypes` LEFT JOIN `gainers` ON `gainers`.`helpTypeUuid` = `helpTypes`.`helpTypeUuid` WHERE `gainers`.`helpTypeUuid`= `helpTypes`.`helpTypeUuid`;'
+
+    bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
+      if (dbErr) {
+        res.status(400).send({ response: 'Eroare în timpul citirii!', status: 400 }).end()
+      }
+      let filteredGainers = dbRes.filter((gainer) => {
+        let isValid = true
+        for (let key in filters) {
+          filters[key] ? (isValid = isValid && gainer[key] == filters[key]) : null
+        }
+        return isValid
+      })
+      res.status(200).send({
+        response: filteredGainers,
+        status: 200,
+        count: filteredGainers.length,
+      })
+      bank_of_time.end()
+      return null
     })
-    res.status(200).send({
-      response: filteredGainers,
-      status: 200,
-      count: filteredGainers.length,
-    })
-    bank_of_time.end()
-    return null
   })
-})
 app.delete('/user/:uuid', (req, res) => {
   let tokenValid = true
 
@@ -254,7 +299,10 @@ app.delete('/user/:uuid', (req, res) => {
         return res.status(400).send({ response: dbErr.message, status: 400 }).end()
       }
       if (dbRes) {
-        return res.status(200).send({ response: 'User deleted with succes!', status: 200 }).end()
+        return res
+          .status(200)
+          .send({ response: 'Utilizatorul a fost șters cu succes!', status: 200 })
+          .end()
       }
     })
   }
@@ -290,7 +338,7 @@ app.put('/user/change-password/:uuid', (req, res) => {
       if (dbRes) {
         return res
           .status(200)
-          .send({ response: 'Password change with success!', status: 200 })
+          .send({ response: 'Parola a fost schimbată cu succes!', status: 200 })
           .end()
       }
     })
@@ -397,9 +445,9 @@ app.get('/appointment/:uuid', (req, res) => {
 app.get('/appointments', (req, res) => {
   const bank_of_time = db
   bank_of_time.execute(
-    `SELECT COUNT(*) As numberPendingCards FROM appointments WHERE status= 'În așteptare';`,
+    `SELECT COUNT(*) As numberCheckCards FROM appointments WHERE status='În verificare';`,
     (dbErr, dbRes) => {
-      const numberPendingCards = dbRes[0].numberPendingCards
+      const numberCheckCards = dbRes[0].numberCheckCards
       const queryAppoiments = `SELECT * FROM gainers LEFT OUTER JOIN appointments ON appointments.gainerUuid = gainers.gainerUuid LEFT OUTER JOIN users ON users.userUuid = appointments.userUuid ;`
       bank_of_time.execute(queryAppoiments, (dbErr, dbRes) => {
         if (dbErr) {
@@ -408,7 +456,7 @@ app.get('/appointments', (req, res) => {
         if (dbRes) {
           res
             .status(200)
-            .send({ response: dbRes, numberPendingCards: numberPendingCards, status: 200 })
+            .send({ response: dbRes, numberCheckCards: numberCheckCards, status: 200 })
             .end()
         }
       })
@@ -437,9 +485,16 @@ app.post(
     const mailData = {
       from: 'bankoftimero@gmail.com',
       to: 'vaida.lorena1702@gmail.com',
-      subject: `Aici se află programarea ta, de pe Banca Timpului!`,
+      subject: `Programare, Banca Timpului!`,
       text: `Programarea!`,
-      html: `<b>Bună, ${req.body.firstName}!</b><br>Ati ales sa ajutati pe domnul/doamna <b>${req.body.nameGainer}</b> in data de ${req.body.dateOfAppointment}.</br><br>Aici este adresa <b>${req.body.adress} ${req.body.cityGainer}</b> unde trebuie sa mergeti. </br>`,
+      html: `<h1></h1>
+      <p>Bună ${req.body.firstName},</p>
+      <p>Suntem foarte încântați că ai ales să îți ajuți comunitatea.  <b>${req.body.nameGainer}</b> este persoana pe care urmează să o ajutați în data de <b>${req.body.dateOfAppointment}</b>.</p>
+      <p>Aici este adresa <b>${req.body.adress} ${req.body.cityGainer}</b> unde trebuie să mergi.</p>
+      <p>Te rugăm, să vă notatezi în calendar pentru a nu uita.</p>
+      <p>Dacă ai întrebări sau comentarii, nu ezita să ne contactezi.</p>
+      <p>Mulțumim,<br>Echipa Banca Timpului</p>
+      `,
     }
     transporter.sendMail(mailData, (err, res) => {
       if (err) {
