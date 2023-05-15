@@ -208,7 +208,21 @@ app.post(
       }
     })
   })
-
+app.delete('/gainer/:gainerUuid', (req, res) => {
+  const bank_of_time = db
+  const gainerUuid = req.params.gainerUuid
+  bank_of_time.execute(`DELETE FROM gainers WHERE gainerUuid='${gainerUuid}'`, (dbErr, dbRes) => {
+    if (dbErr) {
+      return res.status(400).send({ response: dbErr.message, status: 400 }).end()
+    }
+    if (dbRes) {
+      return res
+        .status(200)
+        .send({ response: 'Beneficiarul a fost șters cu succes!', status: 200 })
+        .end()
+    }
+  })
+})
 app.post(
   '/newgainer',
   body('nameGainer').isLength({ min: 1 }),
@@ -259,6 +273,27 @@ app.post(
     }
   },
 ),
+  app.put('/gainer/update/:gainerUuid', (req, res) => {
+    const bank_of_time = db
+    const gainerUuid = req.params.gainerUuid
+    let fieldForUpdate = []
+    Object.keys(req.body).map((key) => {
+      fieldForUpdate.push(' ' + key + '=' + "'" + req.body[key] + "'")
+    })
+    const persoQuery =
+      `UPDATE gainers SET` + fieldForUpdate.join() + `WHERE gainerUuid = '${gainerUuid}'`
+    bank_of_time.execute(persoQuery, (dbErr, dbRes) => {
+      if (dbErr) {
+        return res.status(400).send({ response: dbErr.message, status: 400 }).end()
+      }
+      if (dbRes) {
+        return res
+          .status(200)
+          .send({ response: 'Beneficiarul a fost actualizat cu succes!', status: 200 })
+          .end()
+      }
+    })
+  }),
   app.get('/gainers/filter', (req, res) => {
     const bank_of_time = db
     const filters = (({ helpTypeUuid, city }) => ({
@@ -442,26 +477,30 @@ app.get('/appointment/:uuid', (req, res) => {
     })
   }
 })
+app.get('/gainer-appointments/:gainerUuid', (req, res) => {
+  const bank_of_time = db
+  const gainerUUuid = req.params.gainerUuid
+  const querySelectGainers = `SELECT * FROM appointments LEFT OUTER JOIN users ON users.userUuid = appointments.userUuid WHERE gainerUuid = '${gainerUUuid}' ORDER BY dateOfAppointment DESC;`
+  bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
+    if (dbRes) {
+      res.status(200).send({ response: dbRes, status: 200 }).end()
+    }
+    if (dbErr) {
+      res.status(400).send({ response: dbErr.message, status: 400 }).end()
+    }
+  })
+})
 app.get('/appointments', (req, res) => {
   const bank_of_time = db
-  bank_of_time.execute(
-    `SELECT COUNT(*) As numberCheckCards FROM appointments WHERE status='În verificare';`,
-    (dbErr, dbRes) => {
-      const numberCheckCards = dbRes[0].numberCheckCards
-      const queryAppoiments = `SELECT * FROM gainers LEFT OUTER JOIN appointments ON appointments.gainerUuid = gainers.gainerUuid LEFT OUTER JOIN users ON users.userUuid = appointments.userUuid ;`
-      bank_of_time.execute(queryAppoiments, (dbErr, dbRes) => {
-        if (dbErr) {
-          res.status(400).send({ response: dbErr.message, status: 400 }).end()
-        }
-        if (dbRes) {
-          res
-            .status(200)
-            .send({ response: dbRes, numberCheckCards: numberCheckCards, status: 200 })
-            .end()
-        }
-      })
-    },
-  )
+  const queryAppoiments = `SELECT * FROM gainers LEFT OUTER JOIN appointments ON appointments.gainerUuid = gainers.gainerUuid LEFT OUTER JOIN users ON users.userUuid = appointments.userUuid ;`
+  bank_of_time.execute(queryAppoiments, (dbErr, dbRes) => {
+    if (dbErr) {
+      res.status(400).send({ response: dbErr.message, status: 400 }).end()
+    }
+    if (dbRes) {
+      res.status(200).send({ response: dbRes, status: 200 }).end()
+    }
+  })
 })
 app.post(
   '/mailAppointment',
