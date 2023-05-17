@@ -7,7 +7,6 @@ import cors from 'cors'
 import jwt from 'jsonwebtoken'
 import console from 'console'
 import nodemailer from 'nodemailer'
-import { stringify } from 'querystring'
 
 const app = express()
 app.use(
@@ -453,29 +452,16 @@ app.post(
 )
 app.get('/appointment/:uuid', (req, res) => {
   const bank_of_time = db
-  let tokenValid = true
-  // jwt.verify(req.headers.authtoken, process.env.SECRET_TOKEN, (err, decoded) => {
-  //   if (err) {
-  //     res.status(400).send({ response: 'Token invalid/expired!', status: 400 }).end()
-  //   }
-  //   if (decoded) {
-  //     req.tokenData = decoded
-  //     tokenValid = true
-  //   }
-  // })
-
-  if (tokenValid) {
-    const userUuid = req.params.uuid
-    const querySelectGainers = `SELECT * FROM gainers LEFT OUTER JOIN appointments ON appointments.gainerUuid = gainers.gainerUuid WHERE appointments.gainerUuid = gainers.gainerUuid AND userUuid = '${userUuid}' ORDER BY dateOfAppointment DESC;`
-    bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
-      if (dbRes) {
-        res.status(200).send({ response: dbRes, status: 200 }).end()
-      }
-      if (dbErr) {
-        res.status(400).send({ response: dbErr.message, status: 400 }).end()
-      }
-    })
-  }
+  const userUuid = req.params.uuid
+  const querySelectGainers = `SELECT * FROM gainers LEFT OUTER JOIN appointments ON appointments.gainerUuid = gainers.gainerUuid WHERE appointments.gainerUuid = gainers.gainerUuid AND userUuid = '${userUuid}' ORDER BY dateOfAppointment DESC;`
+  bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
+    if (dbRes) {
+      res.status(200).send({ response: dbRes, status: 200 }).end()
+    }
+    if (dbErr) {
+      res.status(400).send({ response: dbErr.message, status: 400 }).end()
+    }
+  })
 })
 app.get('/gainer-appointments/:gainerUuid', (req, res) => {
   const bank_of_time = db
@@ -530,7 +516,7 @@ app.post(
       <p>Bună ${req.body.firstName},</p>
       <p>Suntem foarte încântați că ai ales să îți ajuți comunitatea.  <b>${req.body.nameGainer}</b> este persoana pe care urmează să o ajutați în data de <b>${req.body.dateOfAppointment}</b>.</p>
       <p>Aici este adresa <b>${req.body.adress} ${req.body.cityGainer}</b> unde trebuie să mergi.</p>
-      <p>Te rugăm, să vă notatezi în calendar pentru a nu uita.</p>
+      <p>Te rugăm, să vă notezi în calendar pentru a nu uita.</p>
       <p>Dacă ai întrebări sau comentarii, nu ezita să ne contactezi.</p>
       <p>Mulțumim,<br>Echipa Banca Timpului</p>
       `,
@@ -539,8 +525,9 @@ app.post(
       if (err) {
         return console.log(err)
       }
-
-      res.status(200).send({ message: 'Mailul a fost trimis!' })
+      if (dbRes) {
+        res.status(200).send({ message: 'Mailul a fost trimis!' })
+      }
     })
   },
 )
