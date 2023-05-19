@@ -144,6 +144,28 @@ app.put('/user/update/:uuid', (req, res) => {
     })
   }
 })
+app.put(
+  '/gainer/update/list-of-dates/:gainerUuid',
+  body('listOfDates').isLength({ min: 1 }),
+  (req, res) => {
+    const bank_of_time = db
+    const gainerUuid = req.params.gainerUuid
+    const listOfDates = req.body.listOfDates
+    console.log(listOfDates)
+    const persoQuery = `UPDATE gainers SET listOfDates = '${listOfDates}' WHERE gainerUuid = '${gainerUuid}'`
+    bank_of_time.execute(persoQuery, (dbErr, dbRes) => {
+      if (dbErr) {
+        return res.status(400).send({ response: dbErr.message, status: 400 }).end()
+      }
+      if (dbRes) {
+        return res
+          .status(200)
+          .send({ response: 'Lista cu date a fost actualizat cu succes!', status: 200 })
+          .end()
+      }
+    })
+  },
+)
 app.post(
   '/user/register',
   body('firstName').isLength({ min: 1 }),
