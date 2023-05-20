@@ -8,7 +8,7 @@ import jwt from 'jsonwebtoken'
 import console from 'console'
 import nodemailer from 'nodemailer'
 
-const app = express()
+export const app = express()
 app.use(
   cors({
     origin: '*',
@@ -16,7 +16,7 @@ app.use(
     methods: 'GET, POST, OPTIONS, PUT, PATCH, DELETE',
   }),
 )
-const db = mysql.createConnection({
+export const db = mysql.createConnection({
   host: 'localhost',
   user: 'root',
   password: 'password',
@@ -166,6 +166,59 @@ app.put(
     })
   },
 )
+app.put(
+  '/appointments/update/status/:appointmentUuid',
+  body('status').isLength({ min: 1 }),
+  (req, res) => {
+    const bank_of_time = db
+    const appUuid = req.params.appointmentUuid
+    const status = req.body.status
+    const persoQuery = `UPDATE appointments SET status = '${status}' WHERE appointmentUuid = '${appUuid}'`
+    bank_of_time.execute(persoQuery, (dbErr, dbRes) => {
+      if (dbErr) {
+        return res.status(400).send({ response: dbErr.message, status: 400 }).end()
+      }
+      if (dbRes) {
+        return res
+          .status(200)
+          .send({ response: 'Status-ul a fost actualizat cu succes!', status: 200 })
+          .end()
+      }
+    })
+  },
+)
+app.put('/users/update/time-volunteering/:userUuid', body('timeVolunteering'), (req, res) => {
+  const bank_of_time = db
+  const userUuid = req.params.userUuid
+  const timeVolunteering = req.body.timeVolunteering
+
+  bank_of_time.execute(
+    `SELECT countTime FROM users WHERE userUuid = '${userUuid}'`,
+    (dbErr, dbRess) => {
+      if (dbRess) {
+        const counter = dbRess[0].countTime + timeVolunteering
+
+        bank_of_time.execute(
+          `UPDATE users SET countTime = '${counter}' WHERE userUuid = '${userUuid}'`,
+          (dbErr, dbRes) => {
+            if (dbErr) {
+              return res.status(400).send({ response: dbErr.message, status: 400 }).end()
+            }
+            if (dbRes) {
+              return res
+                .status(200)
+                .send({
+                  response: 'Statusul orelor de voluntariat a fost actualizat cu succes!',
+                  status: 200,
+                })
+                .end()
+            }
+          },
+        )
+      }
+    },
+  )
+})
 app.post(
   '/user/register',
   body('firstName').isLength({ min: 1 }),
@@ -400,40 +453,8 @@ app.put('/user/change-password/:uuid', (req, res) => {
     })
   }
 })
-//appointemts
 
-const updateListOfDates = () => {
-  const bank_of_time = db
-  const userUuid = req.params.uuid
-  bank_of_time.execute(`SELECT * FROM users WHERE userUuid = '${userUuid}'`, (dbErr, dbRes) => {
-    if (dbErr) {
-      res.status(400).send({ response: dbErr.message, status: 400 }).end()
-    }
-    if (dbRes) {
-      console.log(dbRes)
-      res.status(200).send({ response: dbRes, status: 200 }).end()
-    }
-  })
-}
-app.get('/aaa/:uuid/:app', (req, res) => {
-  const bank_of_time = db
-  const gainerUuid = req.params.uuid
-  const appointment = req.params.app
-  console.log(appointment)
-  bank_of_time.execute(
-    `SELECT listOfDates FROM gainers WHERE gainerUuid = '${gainerUuid}'`,
-    (dbErr, dbRes) => {
-      if (dbRes) {
-        const aa = dbRes[0].listOfDates
-        console.log(aa)
-        const removeDate = aa.replace(appointment.concat(','), '')
-        console.log(removeDate)
-        //dbRes[0].listOfDates.map((item) => console.log(item))
-        // res.status(200).send({ response: dbRes, status: 200 }).end()
-      }
-    },
-  )
-})
+//appointments
 app.post(
   '/appointment',
   body('userUuid').isLength({ min: 1 }),
@@ -520,15 +541,6 @@ app.post(
   body('dateOfAppointment').isLength({ min: 1 }),
 
   (req, res) => {
-    const transporter = nodemailer.createTransport({
-      port: 587,
-      host: 'smtp.gmail.com',
-      auth: {
-        user: 'bankoftimero@gmail.com',
-        pass: 'mscjfohfuephgsia',
-      },
-      secure: false,
-    })
     const mailData = {
       from: 'bankoftimero@gmail.com',
       to: 'vaida.lorena1702@gmail.com',
@@ -538,19 +550,30 @@ app.post(
       <p>Bună ${req.body.firstName},</p>
       <p>Suntem foarte încântați că ai ales să îți ajuți comunitatea.  <b>${req.body.nameGainer}</b> este persoana pe care urmează să o ajutați în data de <b>${req.body.dateOfAppointment}</b>.</p>
       <p>Aici este adresa <b>${req.body.adress} ${req.body.cityGainer}</b> unde trebuie să mergi.</p>
-      <p>Te rugăm, să vă notezi în calendar pentru a nu uita.</p>
+      <p>Te rugăm, să vă notezi în calendar pentru a nu uita.
       <p>Dacă ai întrebări sau comentarii, nu ezita să ne contactezi.</p>
       <p>Mulțumim,<br>Echipa Banca Timpului</p>
       `,
     }
-    transporter.sendMail(mailData, (err, res) => {
-      if (err) {
-        return console.log(err)
-      }
-      if (dbRes) {
-        res.status(200).send({ message: 'Mailul a fost trimis!' })
-      }
-    })
+    nodemailer
+      .createTransport({
+        port: 587,
+        host: 'smtp.gmail.com',
+        auth: {
+          user: 'bankoftimero@gmail.com',
+          pass: 'mscjfohfuephgsia',
+        },
+        secure: false,
+      })
+      .sendMail(mailData, (err, res) => {
+        if (err) {
+          return console.log(err)
+        }
+        if (dbRes) {
+          return console.log(res)
+        }
+      })
+    res.status(200).send({ message: 'Mailul a fost trimis!' })
   },
 )
 
