@@ -16,11 +16,14 @@ app.use(
     methods: 'GET, POST, OPTIONS, PUT, PATCH, DELETE',
   }),
 )
-export const db = mysql.createConnection({
+export const db = mysql.createPool({
   host: 'localhost',
   user: 'root',
   password: 'password',
   database: 'bank-of-time-database',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
 })
 
 app.use(bodyParser.json())
@@ -34,7 +37,7 @@ const generateAccessToken = (email) => {
 
 app.post(
   '/user/login',
-  body('email').isEmail().normalizeEmail(),
+  body('email').isEmail(),
   body('password').isLength({ min: 1 }),
   (req, res) => {
     const errors = validationResult(req)
@@ -223,7 +226,7 @@ app.post(
   '/user/register',
   body('firstName').isLength({ min: 1 }),
   body('lastName').isLength({ min: 1 }),
-  body('email').isEmail().normalizeEmail(),
+  body('email').isEmail(),
   body('phoneNumber').isLength({ min: 1 }),
   body('password').isLength({ min: 1 }),
   body('city').isLength({ min: 1 }),
@@ -249,9 +252,9 @@ app.post(
       const hashedPw = bcrypt.hashSync(userInformation.password, 10)
       if (hashedPw) {
         bank_of_time.execute(
-          `INSERT INTO users (firstname, lastname, email, phoneNumber, password, city, gender, userUuid, photo) VALUES (
+          `INSERT INTO users (firstname, lastname, email, phoneNumber, password, city, gender, userUuid, photo, countTime, role) VALUES (
       '${userInformation.firstname}','${userInformation.lastname}','${userInformation.email}' ,'${userInformation.phoneNumber}', '${hashedPw}' ,
-      '${userInformation.city}','${userInformation.gender}', uuid(),'${userInformation.photo}');`,
+      '${userInformation.city}','${userInformation.gender}', uuid(),'${userInformation.photo}', '0','user');`,
           (dbErr, dbRes) => {
             if (dbErr) {
               return res.status(400).send({ response: dbErr.message, status: 400 }).end()
@@ -268,35 +271,35 @@ app.post(
     }
   },
 ),
-  app.get('/gainers', (req, res) => {
-    const bank_of_time = db
+  // app.get('/gainers', (req, res) => {
+  //   const bank_of_time = db
 
-    const querySelectGainers =
-      'SELECT `gainers`.* ,`helpTypes`.* FROM `helpTypes` LEFT JOIN `gainers` ON `gainers`.`helpTypeUuid` = `helpTypes`.`helpTypeUuid` WHERE `gainers`.`helpTypeUuid`= `helpTypes`.`helpTypeUuid`;'
-    bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
+  //   const querySelectGainers =
+  //     'SELECT `gainers`.* ,`helpTypes`.* FROM `helpTypes` LEFT JOIN `gainers` ON `gainers`.`helpTypeUuid` = `helpTypes`.`helpTypeUuid` WHERE `gainers`.`helpTypeUuid`= `helpTypes`.`helpTypeUuid`;'
+  //   bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
+  //     if (dbErr) {
+  //       res.status(400).send({ response: dbErr.message, status: 400 }).end()
+  //     }
+  //     if (dbRes) {
+  //       res.status(200).send({ response: dbRes, status: 200 }).end()
+  //     }
+  //   })
+  // })
+  app.delete('/gainer/:gainerUuid', (req, res) => {
+    const bank_of_time = db
+    const gainerUuid = req.params.gainerUuid
+    bank_of_time.execute(`DELETE FROM gainers WHERE gainerUuid='${gainerUuid}'`, (dbErr, dbRes) => {
       if (dbErr) {
-        res.status(400).send({ response: dbErr.message, status: 400 }).end()
+        return res.status(400).send({ response: dbErr.message, status: 400 }).end()
       }
       if (dbRes) {
-        res.status(200).send({ response: dbRes, status: 200 }).end()
+        return res
+          .status(200)
+          .send({ response: 'Beneficiarul a fost șters cu succes!', status: 200 })
+          .end()
       }
     })
   })
-app.delete('/gainer/:gainerUuid', (req, res) => {
-  const bank_of_time = db
-  const gainerUuid = req.params.gainerUuid
-  bank_of_time.execute(`DELETE FROM gainers WHERE gainerUuid='${gainerUuid}'`, (dbErr, dbRes) => {
-    if (dbErr) {
-      return res.status(400).send({ response: dbErr.message, status: 400 }).end()
-    }
-    if (dbRes) {
-      return res
-        .status(200)
-        .send({ response: 'Beneficiarul a fost șters cu succes!', status: 200 })
-        .end()
-    }
-  })
-})
 app.post(
   '/newgainer',
   body('nameGainer').isLength({ min: 1 }),
@@ -368,33 +371,59 @@ app.post(
       }
     })
   }),
-  app.get('/gainers/filter', (req, res) => {
+  app.get('/gainers', (req, res) => {
     const bank_of_time = db
-    const filters = (({ helpTypeUuid, city }) => ({
-      helpTypeUuid,
-      city,
-    }))(req.query)
-    const querySelectGainers =
-      'SELECT `gainers`.* ,`helpTypes`.* FROM `helpTypes` LEFT JOIN `gainers` ON `gainers`.`helpTypeUuid` = `helpTypes`.`helpTypeUuid` WHERE `gainers`.`helpTypeUuid`= `helpTypes`.`helpTypeUuid`;'
+    const helpType = req.query.helpTypeUuid
+    const city = req.query.city
+    const dateInterval = req.query.dateInterval
 
+    let querySelectGainers =
+      'SELECT `gainers`.* ,`helpTypes`.* FROM `helpTypes` LEFT JOIN `gainers` ON `gainers`.`helpTypeUuid` = `helpTypes`.`helpTypeUuid` WHERE `gainers`.`helpTypeUuid`= `helpTypes`.`helpTypeUuid`'
+
+    if (helpType) {
+      querySelectGainers += " AND `gainers`.helpTypeUuid = '" + helpType + "'"
+    }
+    if (city) {
+      querySelectGainers += " AND `gainers`.cityGainer = '" + city + "'"
+    }
+    let interval
+    if (dateInterval) {
+      interval = dateInterval.split(',')
+    }
     bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
       if (dbErr) {
-        res.status(400).send({ response: 'Eroare în timpul citirii!', status: 400 }).end()
-      }
-      let filteredGainers = dbRes.filter((gainer) => {
-        let isValid = true
-        for (let key in filters) {
-          filters[key] ? (isValid = isValid && gainer[key] == filters[key]) : null
+        console.log(dbErr)
+        res
+          .status(400)
+          .send({ response: 'Eroare în timpul citirii!', error: dbErr, status: 400 })
+          .end()
+      } else {
+        if (interval && interval.length > 1) {
+          const updatedDbRes = []
+          dbRes.forEach((elem) => {
+            const elemDates = elem.listOfDates.split(',')
+            elemDates.forEach((date) => {
+              if (
+                new Date(date) > new Date(interval[0]) &&
+                new Date(date) < new Date(interval[1])
+              ) {
+                updatedDbRes.push(elem)
+              }
+            })
+          })
+          res.status(200).send({
+            response: updatedDbRes,
+            status: 200,
+            count: updatedDbRes.length || 0,
+          })
+        } else {
+          res.status(200).send({
+            response: dbRes,
+            status: 200,
+            count: dbRes.length || 0,
+          })
         }
-        return isValid
-      })
-      res.status(200).send({
-        response: filteredGainers,
-        status: 200,
-        count: filteredGainers.length,
-      })
-      bank_of_time.end()
-      return null
+      }
     })
   })
 app.delete('/user/:uuid', (req, res) => {
@@ -496,10 +525,19 @@ app.post(
 app.get('/appointment/:uuid', (req, res) => {
   const bank_of_time = db
   const userUuid = req.params.uuid
-  const querySelectGainers = `SELECT * FROM gainers LEFT OUTER JOIN appointments ON appointments.gainerUuid = gainers.gainerUuid WHERE appointments.gainerUuid = gainers.gainerUuid AND userUuid = '${userUuid}' ORDER BY dateOfAppointment DESC;`
+  const querySelectGainers = `SELECT * FROM gainers LEFT OUTER JOIN appointments ON appointments.gainerUuid = gainers.gainerUuid WHERE appointments.gainerUuid = gainers.gainerUuid AND userUuid = '${userUuid}';`
   bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
     if (dbRes) {
-      res.status(200).send({ response: dbRes, status: 200 }).end()
+      res
+        .status(200)
+        .send({
+          response: dbRes,
+          // nrAppPending: nrAppPending,
+          // nrAppFinish: nrAppFinish,
+          // nrAppCancel: nrAppCancel,
+          status: 200,
+        })
+        .end()
     }
     if (dbErr) {
       res.status(400).send({ response: dbErr.message, status: 400 }).end()
