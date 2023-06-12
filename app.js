@@ -51,7 +51,7 @@ app.post(
       }
       const bank_of_time = db
       bank_of_time.execute(
-        `SELECT userUuid, email, password, role FROM users WHERE email = '${userLoginInfo.email}'`,
+        `SELECT userUuid, email, password, role, firstname, lastname FROM users WHERE email = '${userLoginInfo.email}'`,
         (dbErr, dbRes) => {
           if (dbErr) {
             res.status(401).send({ response: dbErr.message, status: 401 }).end()
@@ -75,6 +75,8 @@ app.post(
                       userUuid: dbRes[0].userUuid,
                       authToken: authToken,
                       role: dbRes[0].role,
+                      firstName: dbRes[0].firstname,
+                      lastName: dbRes[0].lastname,
                     },
                   })
                   .end()
@@ -426,6 +428,7 @@ app.post(
       }
     })
   })
+
 app.delete('/user/:uuid', (req, res) => {
   let tokenValid = true
 
@@ -505,8 +508,7 @@ app.post(
       }
       console.log(appointment)
       const bank_of_time = db
-      //updateListOfDates()
-      // bank_of_time.execute(`UPDATE gainers SET listOfDates WHERE gainerUuid = '${gainerUuid}'`)
+
       bank_of_time.execute(
         `INSERT INTO appointments ( userUuid, gainerUuid, dateOfAppointment, status, timeVolunteering) VALUES (
       '${appointment.userUuid}','${appointment.gainerUuid}','${appointment.dateOfAppointment}' ,'${appointment.status}','${appointment.timeVolunteering}');`,
@@ -566,6 +568,46 @@ app.get('/appointments', (req, res) => {
     }
     if (dbRes) {
       res.status(200).send({ response: dbRes, status: 200 }).end()
+    }
+  })
+})
+app.get('/appointments-complete/:userUuid', (req, res) => {
+  const bank_of_time = db
+  const userUuid = req.params.userUuid
+  const queryAppoiments = `SELECT count(*) as completeAppointment FROM appointments WHERE status='finalizat' AND userUuid='${userUuid}' ; `
+  bank_of_time.execute(queryAppoiments, (dbErr, dbRes) => {
+    if (dbErr) {
+      res.status(400).send({ response: dbErr.message, status: 400 }).end()
+    }
+    if (dbRes) {
+      res.status(200).send({ response: dbRes[0].completeAppointment, status: 200 }).end()
+    }
+  })
+})
+app.get('/appointments-all/:userUuid', (req, res) => {
+  const bank_of_time = db
+  const userUuid = req.params.userUuid
+  const queryAppoiments = `SELECT count(*) as allAppointment FROM appointments WHERE userUuid='${userUuid}' ; `
+  bank_of_time.execute(queryAppoiments, (dbErr, dbRes) => {
+    if (dbErr) {
+      res.status(400).send({ response: dbErr.message, status: 400 }).end()
+    }
+    if (dbRes) {
+      console.log(dbRes[0].allAppointment)
+      res.status(200).send({ response: dbRes[0].allAppointment, status: 200 }).end()
+    }
+  })
+})
+app.get('/appointments-cancel/:userUuid', (req, res) => {
+  const bank_of_time = db
+  const userUuid = req.params.userUuid
+  const queryAppoiments = `SELECT count(*) as cancelAppointment FROM appointments WHERE status='anulat' AND userUuid='${userUuid}' ; `
+  bank_of_time.execute(queryAppoiments, (dbErr, dbRes) => {
+    if (dbErr) {
+      res.status(400).send({ response: dbErr.message, status: 400 }).end()
+    }
+    if (dbRes) {
+      res.status(200).send({ response: dbRes[0].cancelAppointment, status: 200 }).end()
     }
   })
 })
