@@ -5,7 +5,6 @@ import bodyParser from 'body-parser'
 import { body, validationResult } from 'express-validator'
 import cors from 'cors'
 import jwt from 'jsonwebtoken'
-import console from 'console'
 import nodemailer from 'nodemailer'
 
 export const app = express()
@@ -156,7 +155,6 @@ app.put(
     const bank_of_time = db
     const gainerUuid = req.params.gainerUuid
     const listOfDates = req.body.listOfDates
-    console.log(listOfDates)
     const persoQuery = `UPDATE gainers SET listOfDates = '${listOfDates}' WHERE gainerUuid = '${gainerUuid}'`
     bank_of_time.execute(persoQuery, (dbErr, dbRes) => {
       if (dbErr) {
@@ -171,6 +169,24 @@ app.put(
     })
   },
 )
+app.delete('/appointment/delete/:appointmentUuid', (req, res) => {
+  const bank_of_time = db
+  const appointmentUuid = req.params.appointmentUuid
+  bank_of_time.execute(
+    `DELETE FROM appointments WHERE appointmentUuid='${appointmentUuid}'`,
+    (dbErr, dbRes) => {
+      if (dbErr) {
+        return res.status(400).send({ response: dbErr.message, status: 400 }).end()
+      }
+      if (dbRes) {
+        return res
+          .status(200)
+          .send({ response: 'Programarea a fost anulată cu succes!', status: 200 })
+          .end()
+      }
+    },
+  )
+})
 app.put(
   '/appointments/update/status/:appointmentUuid',
   body('status').isLength({ min: 1 }),
@@ -506,7 +522,7 @@ app.post(
         status: req.body.status,
         timeVolunteering: req.body.timeVolunteering,
       }
-      console.log(appointment)
+
       const bank_of_time = db
 
       bank_of_time.execute(
@@ -593,7 +609,6 @@ app.get('/appointments-all/:userUuid', (req, res) => {
       res.status(400).send({ response: dbErr.message, status: 400 }).end()
     }
     if (dbRes) {
-      console.log(dbRes[0].allAppointment)
       res.status(200).send({ response: dbRes[0].allAppointment, status: 200 }).end()
     }
   })
@@ -608,6 +623,19 @@ app.get('/appointments-cancel/:userUuid', (req, res) => {
     }
     if (dbRes) {
       res.status(200).send({ response: dbRes[0].cancelAppointment, status: 200 }).end()
+    }
+  })
+})
+app.get('/future-appointments/:userUuid', (req, res) => {
+  const bank_of_time = db
+  const userUuid = req.params.userUuid
+  const queryAppoiments = `SELECT * FROM appointments LEFT OUTER JOIN gainers ON appointments.gainerUuid = gainers.gainerUuid WHERE appointments.userUuid='${userUuid}' AND appointments.status='În procesare'; `
+  bank_of_time.execute(queryAppoiments, (dbErr, dbRes) => {
+    if (dbErr) {
+      res.status(400).send({ response: dbErr.message, status: 400 }).end()
+    }
+    if (dbRes) {
+      res.status(200).send({ response: dbRes, status: 200 }).end()
     }
   })
 })
