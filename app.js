@@ -6,8 +6,11 @@ import { body, validationResult } from 'express-validator'
 import cors from 'cors'
 import jwt from 'jsonwebtoken'
 import nodemailer from 'nodemailer'
-
+import dotenv from 'dotenv'
+import console from 'console'
+dotenv.config()
 export const app = express()
+
 app.use(
   cors({
     origin: '*',
@@ -27,6 +30,7 @@ export const db = mysql.createPool({
 
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: false }))
+app.use(express.json({ limit: '25mb' }))
 
 const generateAccessToken = (email) => {
   return jwt.sign({ email }, `${process.env.SECRET_TOKEN}`, {
@@ -94,6 +98,7 @@ app.post(
 )
 app.get('/user/:uuid', (req, res) => {
   const bank_of_time = db
+
   let tokenValid = true
   // jwt.verify(req.headers.authtoken, process.env.SECRET_TOKEN, (err, decoded) => {
   //   if (err) {
@@ -118,35 +123,24 @@ app.get('/user/:uuid', (req, res) => {
 })
 app.put('/user/update/:uuid', (req, res) => {
   const bank_of_time = db
-  let tokenValid = true
-  // jwt.verify(req.headers.authtoken, 'fIb4H7blh0TH4qvrKMZAcWnFVC7FEW00dxb5yBrO', (err, decoded) => {
-  //   if (err) {
-  //     return res.status(400).send({ response: 'Token invalid/expired!', status: 400 }).end()
-  //   }
-  //   if (decoded) {
-  //     req.tokenData = decoded
-  //     tokenValid = true
-  //   }
-  // })
-  if (tokenValid) {
-    const userUuid = req.params.uuid
-    let fieldForUpdate = []
-    Object.keys(req.body).map((key) => {
-      fieldForUpdate.push(' ' + key + '=' + "'" + req.body[key] + "'")
-    })
-    const persoQuery = `UPDATE users SET` + fieldForUpdate.join() + `WHERE userUuid = '${userUuid}'`
-    bank_of_time.execute(persoQuery, (dbErr, dbRes) => {
-      if (dbErr) {
-        return res.status(400).send({ response: dbErr.message, status: 400 }).end()
-      }
-      if (dbRes) {
-        return res
-          .status(200)
-          .send({ response: 'Utilizatorul a fost actualizat cu succes!', status: 200 })
-          .end()
-      }
-    })
-  }
+
+  const userUuid = req.params.uuid
+  let fieldForUpdate = []
+  Object.keys(req.body).map((key) => {
+    fieldForUpdate.push(' ' + key + '=' + "'" + req.body[key] + "'")
+  })
+  const persoQuery = `UPDATE users SET` + fieldForUpdate.join() + `WHERE userUuid = '${userUuid}'`
+  bank_of_time.execute(persoQuery, (dbErr, dbRes) => {
+    if (dbErr) {
+      return res.status(400).send({ response: dbErr.message, status: 400 }).end()
+    }
+    if (dbRes) {
+      return res
+        .status(200)
+        .send({ response: 'Utilizatorul a fost actualizat cu succes!', status: 200 })
+        .end()
+    }
+  })
 })
 app.put(
   '/gainer/update/list-of-dates/:gainerUuid',
@@ -289,20 +283,6 @@ app.post(
     }
   },
 ),
-  // app.get('/gainers', (req, res) => {
-  //   const bank_of_time = db
-
-  //   const querySelectGainers =
-  //     'SELECT `gainers`.* ,`helpTypes`.* FROM `helpTypes` LEFT JOIN `gainers` ON `gainers`.`helpTypeUuid` = `helpTypes`.`helpTypeUuid` WHERE `gainers`.`helpTypeUuid`= `helpTypes`.`helpTypeUuid`;'
-  //   bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
-  //     if (dbErr) {
-  //       res.status(400).send({ response: dbErr.message, status: 400 }).end()
-  //     }
-  //     if (dbRes) {
-  //       res.status(200).send({ response: dbRes, status: 200 }).end()
-  //     }
-  //   })
-  // })
   app.delete('/gainer/:gainerUuid', (req, res) => {
     const bank_of_time = db
     const gainerUuid = req.params.gainerUuid
@@ -391,6 +371,7 @@ app.post(
   }),
   app.get('/gainers', (req, res) => {
     const bank_of_time = db
+
     const helpType = req.query.helpTypeUuid
     const city = req.query.city
     const dateInterval = req.query.dateInterval
@@ -446,40 +427,33 @@ app.post(
   })
 
 app.delete('/user/:uuid', (req, res) => {
-  let tokenValid = true
-
-  if (tokenValid) {
-    const bank_of_time = db
-    const userUuid = req.params.uuid
-    bank_of_time.execute(`DELETE FROM users WHERE userUuid='${userUuid}'`, (dbErr, dbRes) => {
-      if (dbErr) {
-        return res.status(400).send({ response: dbErr.message, status: 400 }).end()
-      }
-      if (dbRes) {
-        return res
-          .status(200)
-          .send({ response: 'Utilizatorul a fost șters cu succes!', status: 200 })
-          .end()
-      }
-    })
-  }
+  const bank_of_time = db
+  const userUuid = req.params.uuid
+  bank_of_time.execute(`DELETE FROM users WHERE userUuid='${userUuid}'`, (dbErr, dbRes) => {
+    if (dbErr) {
+      return res.status(400).send({ response: dbErr.message, status: 400 }).end()
+    }
+    if (dbRes) {
+      return res
+        .status(200)
+        .send({ response: 'Utilizatorul a fost șters cu succes!', status: 200 })
+        .end()
+    }
+  })
 })
 app.put('/user/change-password/:uuid', (req, res) => {
+  const bank_of_time = db
   let tokenValid = true
-
+  // jwt.verify(req.headers.authtoken, process.env.SECRET_TOKEN, (err, decoded) => {
+  //   if (err) {
+  //     res.status(400).send({ response: 'Token invalid/expired!', status: 400 }).end()
+  //   }
+  //   if (decoded) {
+  //     req.tokenData = decoded
+  //     tokenValid = true
+  //   }
+  // })
   if (tokenValid) {
-    const bank_of_time = db
-    let tokenValid = true
-    // jwt.verify(req.headers.authtoken, 'fIb4H7blh0TH4qvrKMZAcWnFVC7FEW00dxb5yBrO', (err, decoded) => {
-    //   if (err) {
-    //     return res.status(400).send({ response: 'Token invalid/expired!', status: 400 }).end()
-    //   }
-    //   if (decoded) {
-    //     req.tokenData = decoded
-    //     tokenValid = true
-    //   }
-    // })
-
     const userUuid = req.params.uuid
     let fieldForUpdate = []
 
@@ -542,50 +516,83 @@ app.post(
 )
 app.get('/appointment/:uuid', (req, res) => {
   const bank_of_time = db
-  const userUuid = req.params.uuid
-  const querySelectGainers = `SELECT * FROM gainers LEFT OUTER JOIN appointments ON appointments.gainerUuid = gainers.gainerUuid WHERE appointments.gainerUuid = gainers.gainerUuid AND userUuid = '${userUuid}';`
-  bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
-    if (dbRes) {
-      res
-        .status(200)
-        .send({
-          response: dbRes,
-          // nrAppPending: nrAppPending,
-          // nrAppFinish: nrAppFinish,
-          // nrAppCancel: nrAppCancel,
-          status: 200,
-        })
-        .end()
-    }
-    if (dbErr) {
-      res.status(400).send({ response: dbErr.message, status: 400 }).end()
-    }
-  })
+  let tokenValid = true
+  // jwt.verify(req.headers.authtoken, process.env.SECRET_TOKEN, (err, decoded) => {
+  //   if (err) {
+  //     res.status(400).send({ response: 'Token invalid/expired!', status: 400 }).end()
+  //   }
+  //   if (decoded) {
+  //     req.tokenData = decoded
+  //     tokenValid = true
+  //   }
+  // })
+  if (tokenValid) {
+    const userUuid = req.params.uuid
+    const querySelectGainers = `SELECT * FROM gainers LEFT OUTER JOIN appointments ON appointments.gainerUuid = gainers.gainerUuid WHERE appointments.gainerUuid = gainers.gainerUuid AND userUuid = '${userUuid}';`
+    bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
+      if (dbRes) {
+        res
+          .status(200)
+          .send({
+            response: dbRes,
+            status: 200,
+          })
+          .end()
+      }
+      if (dbErr) {
+        res.status(400).send({ response: dbErr.message, status: 400 }).end()
+      }
+    })
+  }
 })
 app.get('/gainer-appointments/:gainerUuid', (req, res) => {
   const bank_of_time = db
-  const gainerUUuid = req.params.gainerUuid
-  const querySelectGainers = `SELECT * FROM appointments LEFT OUTER JOIN users ON users.userUuid = appointments.userUuid WHERE gainerUuid = '${gainerUUuid}' ORDER BY dateOfAppointment DESC;`
-  bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
-    if (dbRes) {
-      res.status(200).send({ response: dbRes, status: 200 }).end()
-    }
-    if (dbErr) {
-      res.status(400).send({ response: dbErr.message, status: 400 }).end()
-    }
-  })
+  let tokenValid = true
+  // jwt.verify(req.headers.authtoken, process.env.SECRET_TOKEN, (err, decoded) => {
+  //   if (err) {
+  //     res.status(400).send({ response: 'Token invalid/expired!', status: 400 }).end()
+  //   }
+  //   if (decoded) {
+  //     req.tokenData = decoded
+  //     tokenValid = true
+  //   }
+  // })
+  if (tokenValid) {
+    const gainerUUuid = req.params.gainerUuid
+    const querySelectGainers = `SELECT * FROM appointments LEFT OUTER JOIN users ON users.userUuid = appointments.userUuid WHERE gainerUuid = '${gainerUUuid}' ORDER BY dateOfAppointment DESC;`
+    bank_of_time.execute(querySelectGainers, (dbErr, dbRes) => {
+      if (dbRes) {
+        res.status(200).send({ response: dbRes, status: 200 }).end()
+      }
+      if (dbErr) {
+        res.status(400).send({ response: dbErr.message, status: 400 }).end()
+      }
+    })
+  }
 })
 app.get('/appointments', (req, res) => {
   const bank_of_time = db
-  const queryAppoiments = `SELECT * FROM gainers LEFT OUTER JOIN appointments ON appointments.gainerUuid = gainers.gainerUuid LEFT OUTER JOIN users ON users.userUuid = appointments.userUuid ;`
-  bank_of_time.execute(queryAppoiments, (dbErr, dbRes) => {
-    if (dbErr) {
-      res.status(400).send({ response: dbErr.message, status: 400 }).end()
-    }
-    if (dbRes) {
-      res.status(200).send({ response: dbRes, status: 200 }).end()
-    }
-  })
+  let tokenValid = true
+  // jwt.verify(req.headers.authtoken, process.env.SECRET_TOKEN, (err, decoded) => {
+  //   if (err) {
+  //     res.status(400).send({ response: 'Token invalid/expired!', status: 400 }).end()
+  //   }
+  //   if (decoded) {
+  //     req.tokenData = decoded
+  //     tokenValid = true
+  //   }
+  // })
+  if (tokenValid) {
+    const queryAppoiments = `SELECT * FROM gainers LEFT OUTER JOIN appointments ON appointments.gainerUuid = gainers.gainerUuid LEFT OUTER JOIN users ON users.userUuid = appointments.userUuid ;`
+    bank_of_time.execute(queryAppoiments, (dbErr, dbRes) => {
+      if (dbErr) {
+        res.status(400).send({ response: dbErr.message, status: 400 }).end()
+      }
+      if (dbRes) {
+        res.status(200).send({ response: dbRes, status: 200 }).end()
+      }
+    })
+  }
 })
 app.get('/appointments-complete/:userUuid', (req, res) => {
   const bank_of_time = db
@@ -684,5 +691,56 @@ app.post(
     res.status(200).send({ message: 'Mailul a fost trimis!' })
   },
 )
+app.post('/forgotPassword', body('email').isLength({ min: 1 }), (req, res) => {
+  const bank_of_time = db
+  var newPassword = Math.random().toString(36)
+
+  const mailData = {
+    from: 'bankoftimero@gmail.com',
+    to: `${req.body.email}`,
+    subject: `Parola resetată, cont Banca Timpului!`,
+    text: `Parola resetată cu succes!`,
+    html: `<h1></h1>
+      <p>Bună!</p>
+      <p>Ai solicitat resetarea parolei, aici este noua parolă:<br><b>${newPassword}</b></br></p>
+      <p>Pentru o securitate mai mare te rugăm să îți schimbi parola cu una mai puternică</p>
+      <p>Dacă ai întrebări sau comentarii, nu ezita să ne contactezi.</p>
+      <p>Mulțumim,<br>Echipa Banca Timpului</p>
+      `,
+  }
+
+  nodemailer
+    .createTransport({
+      port: 587,
+      host: 'smtp.gmail.com',
+      auth: {
+        user: 'bankoftimero@gmail.com',
+        pass: 'mscjfohfuephgsia',
+      },
+      secure: false,
+    })
+    .sendMail(mailData, (err, res) => {
+      if (err) {
+        return console.log(err)
+      }
+      if (dbRes) {
+      }
+    })
+  const hashedPw = bcrypt.hashSync(newPassword, 10)
+
+  if (hashedPw) {
+    bank_of_time.execute(
+      `UPDATE users SET password = '${hashedPw}' WHERE email = '${req.body.email}'`,
+      (dbErr, dbRes) => {
+        if (dbErr) {
+          return res.status(400).send({ response: dbErr.message, status: 400 }).end()
+        }
+        if (dbRes) {
+        }
+      },
+    )
+  }
+  res.status(200).send({ message: 'Mailul a fost trimis!' })
+})
 
 app.listen('3306')
