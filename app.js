@@ -28,9 +28,8 @@ export const db = mysql.createPool({
   queueLimit: 0,
 })
 
-app.use(bodyParser.json())
-app.use(bodyParser.urlencoded({ extended: false }))
-app.use(express.json({ limit: '25mb' }))
+app.use(bodyParser.json({ limit: '50mb' }))
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true, parameterLimit: 50000 }))
 
 const generateAccessToken = (email) => {
   return jwt.sign({ email }, `${process.env.SECRET_TOKEN}`, {
@@ -119,6 +118,8 @@ app.get('/user/:uuid', (req, res) => {
         res.status(200).send({ response: dbRes, status: 200 }).end()
       }
     })
+  } else {
+    res.status(401).send({ response: 'Token invalid', status: 401 }).end()
   }
 })
 app.put('/user/update/:uuid', (req, res) => {
@@ -473,6 +474,8 @@ app.put('/user/change-password/:uuid', (req, res) => {
           .end()
       }
     })
+  } else {
+    res.status(401).send({ response: 'Token invalid', status: 401 }).end()
   }
 })
 
@@ -543,6 +546,8 @@ app.get('/appointment/:uuid', (req, res) => {
         res.status(400).send({ response: dbErr.message, status: 400 }).end()
       }
     })
+  } else {
+    res.status(401).send({ response: 'Token invalid', status: 401 }).end()
   }
 })
 app.get('/gainer-appointments/:gainerUuid', (req, res) => {
@@ -568,6 +573,8 @@ app.get('/gainer-appointments/:gainerUuid', (req, res) => {
         res.status(400).send({ response: dbErr.message, status: 400 }).end()
       }
     })
+  } else {
+    res.status(401).send({ response: 'Token invalid', status: 401 }).end()
   }
 })
 app.get('/appointments', (req, res) => {
@@ -592,6 +599,8 @@ app.get('/appointments', (req, res) => {
         res.status(200).send({ response: dbRes, status: 200 }).end()
       }
     })
+  } else {
+    res.status(401).send({ response: 'Token invalid', status: 401 }).end()
   }
 })
 app.get('/appointments-complete/:userUuid', (req, res) => {
