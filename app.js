@@ -175,6 +175,78 @@ app.put("/user/update/:uuid", (req, res) => {
   })
 })
 app.put(
+  "/user/update/cv/:uuid",
+  body("cv").isLength({ min: 1 }),
+  (req, res) => {
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) {
+      return res.status(400).send(errors).end()
+    } else {
+      const bank_of_time = db
+      const userUuid = req.params.uuid
+      const cv = req.body.cv
+
+      bank_of_time.execute(
+        `UPDATE users SET cv = ? WHERE userUuid = ?`,
+        [cv, userUuid],
+        (dbErr, dbRes) => {
+          if (dbErr) {
+            return res
+              .status(400)
+              .send({ response: dbErr.message, status: 400 })
+              .end()
+          }
+          if (dbRes) {
+            return res
+              .status(200)
+              .send({
+                response: "CV-ul a fost actualizat cu succes!",
+                status: 200,
+              })
+              .end()
+          }
+        }
+      )
+    }
+  }
+)
+app.get("/user/cv/:uuid", (req, res) => {
+  const bank_of_time = db
+  const userUuid = req.params.uuid
+
+  bank_of_time.execute(
+    `SELECT cv FROM users WHERE userUuid = ?`,
+    [userUuid],
+    (dbErr, dbRes) => {
+      if (dbErr) {
+        return res
+          .status(400)
+          .send({ response: dbErr.message, status: 400 })
+          .end()
+      }
+      if (dbRes && dbRes.length > 0) {
+        return res
+          .status(200)
+          .send({
+            response: {
+              cv: dbRes[0].cv,
+            },
+            status: 200,
+          })
+          .end()
+      } else {
+        return res
+          .status(404)
+          .send({
+            response: "Utilizatorul nu a fost găsit sau nu are CV!",
+            status: 404,
+          })
+          .end()
+      }
+    }
+  )
+})
+app.put(
   "/gainer/update/list-of-dates/:gainerUuid",
   body("listOfDates").isLength({ min: 1 }),
   (req, res) => {
@@ -232,42 +304,111 @@ app.put(
     const bank_of_time = db
     const appUuid = req.params.appointmentUuid
     const status = req.body.status
-    const persoQuery = `UPDATE appointments SET status = '${status}' WHERE appointmentUuid = '${appUuid}'`
-    bank_of_time.execute(persoQuery, (dbErr, dbRes) => {
-      if (dbErr) {
-        return res
-          .status(400)
-          .send({ response: dbErr.message, status: 400 })
-          .end()
+
+    // First, get the appointment details to check if we need to update countTime
+    bank_of_time.execute(
+      `SELECT userUuid, timeVolunteering, status FROM appointments WHERE appointmentUuid = ?`,
+      [appUuid],
+      (dbErr, dbRes) => {
+        if (dbErr) {
+          return res
+            .status(400)
+            .send({ response: dbErr.message, status: 400 })
+            .end()
+        }
+        if (!dbRes || dbRes.length === 0) {
+          return res
+            .status(404)
+            .send({ response: "Programarea nu a fost găsită!", status: 404 })
+            .end()
+        }
+
+        const appointment = dbRes[0]
+        const wasCompleted = appointment.status === "finalizat"
+        const willBeCompleted = status === "finalizat"
+
+        // Update the appointment status
+        bank_of_time.execute(
+          `UPDATE appointments SET status = ? WHERE appointmentUuid = ?`,
+          [status, appUuid],
+          (dbErr, dbRes) => {
+            if (dbErr) {
+              return res
+                .status(400)
+                .send({ response: dbErr.message, status: 400 })
+                .end()
+            }
+            if (dbRes) {
+              // If status is being changed to "finalizat" and it wasn't completed before
+              if (
+                willBeCompleted &&
+                !wasCompleted &&
+                appointment.timeVolunteering > 0
+              ) {
+                // Update user's countTime
+                bank_of_time.execute(
+                  `UPDATE users SET countTime = countTime + ? WHERE userUuid = ?`,
+                  [appointment.timeVolunteering, appointment.userUuid],
+                  (dbErr, dbRes) => {
+                    if (dbErr) {
+                      return res
+                        .status(400)
+                        .send({ response: dbErr.message, status: 400 })
+                        .end()
+                    }
+                    if (dbRes) {
+                      return res
+                        .status(200)
+                        .send({
+                          response:
+                            "Status-ul a fost actualizat cu succes și orele de voluntariat au fost adăugate!",
+                          status: 200,
+                        })
+                        .end()
+                    }
+                  }
+                )
+              } else {
+                return res
+                  .status(200)
+                  .send({
+                    response: "Status-ul a fost actualizat cu succes!",
+                    status: 200,
+                  })
+                  .end()
+              }
+            }
+          }
+        )
       }
-      if (dbRes) {
-        return res
-          .status(200)
-          .send({
-            response: "Status-ul a fost actualizat cu succes!",
-            status: 200,
-          })
-          .end()
-      }
-    })
+    )
   }
 )
 app.put(
   "/users/update/time-volunteering/:userUuid",
-  body("timeVolunteering"),
+  body("timeVolunteering").isNumeric(),
   (req, res) => {
     const bank_of_time = db
     const userUuid = req.params.userUuid
-    const timeVolunteering = req.body.timeVolunteering
+    const timeVolunteering = parseInt(req.body.timeVolunteering) || 0
 
     bank_of_time.execute(
-      `SELECT countTime FROM users WHERE userUuid = '${userUuid}'`,
+      `SELECT countTime FROM users WHERE userUuid = ?`,
+      [userUuid],
       (dbErr, dbRess) => {
-        if (dbRess) {
-          const counter = dbRess[0].countTime + timeVolunteering
+        if (dbErr) {
+          return res
+            .status(400)
+            .send({ response: dbErr.message, status: 400 })
+            .end()
+        }
+        if (dbRess && dbRess.length > 0) {
+          const currentCountTime = parseInt(dbRess[0].countTime) || 0
+          const counter = currentCountTime + timeVolunteering
 
           bank_of_time.execute(
-            `UPDATE users SET countTime = '${counter}' WHERE userUuid = '${userUuid}'`,
+            `UPDATE users SET countTime = ? WHERE userUuid = ?`,
+            [counter, userUuid],
             (dbErr, dbRes) => {
               if (dbErr) {
                 return res
@@ -287,6 +428,11 @@ app.put(
               }
             }
           )
+        } else {
+          return res
+            .status(404)
+            .send({ response: "Utilizatorul nu a fost găsit!", status: 404 })
+            .end()
         }
       }
     )
@@ -322,9 +468,20 @@ app.post(
       const hashedPw = bcrypt.hashSync(userInformation.password, 10)
       if (hashedPw) {
         bank_of_time.execute(
-          `INSERT INTO users (firstname, lastname, email, phoneNumber, password, city, gender, userUuid, photo, countTime, role) VALUES (
-      '${userInformation.firstname}','${userInformation.lastname}','${userInformation.email}' ,'${userInformation.phoneNumber}', '${hashedPw}' ,
-      '${userInformation.city}','${userInformation.gender}', uuid(),'${userInformation.photo}', '0','user');`,
+          `INSERT INTO users (firstname, lastname, email, phoneNumber, password, city, gender, userUuid, photo, cv, countTime, role) VALUES (?, ?, ?, ?, ?, ?, ?, uuid(), ?, ?, ?, ?)`,
+          [
+            userInformation.firstname,
+            userInformation.lastname,
+            userInformation.email,
+            userInformation.phoneNumber,
+            hashedPw,
+            userInformation.city,
+            userInformation.gender,
+            userInformation.photo,
+            NULL,
+            0, // countTime as number
+            "user",
+          ],
           (dbErr, dbRes) => {
             if (dbErr) {
               return res
@@ -381,7 +538,7 @@ app.post(
   body("responsabilities").isLength({ min: 1 }),
   body("validation").isLength({ min: 1 }),
   body("skills").isLength({ min: 1 }),
-  body("hours").isLength({ min: 1 }),
+  body("hours").isNumeric(),
   body("fileName").isLength({ min: 1 }),
   body("extractText").isLength({ min: 1 }),
   body("urlDoc").isLength({ min: 1 }),
@@ -416,7 +573,7 @@ app.post(
         responsabilities: responsabilities,
         validation: validation,
         skills: skills,
-        hours: hours,
+        hours: parseInt(hours) || 0,
         urlDoc: urlDoc,
         fileName: fileName,
         extractText: extractText,
@@ -426,7 +583,7 @@ app.post(
       const bank_of_time = db
       bank_of_time.execute(
         `INSERT INTO volunteerDocuments (uuidDoc, eventName, organization, dateFrom, dateTo, role, responsabilities, validation, skills, hours,fileName, extractText, urlDoc,  userUuid) VALUES (
-           uuid(), '${volunteerDocumentInformation.eventName}', '${volunteerDocumentInformation.organization}', '${volunteerDocumentInformation.dateFrom}', '${volunteerDocumentInformation.dateTo}', '${volunteerDocumentInformation.role}', '${volunteerDocumentInformation.responsabilities}', '${volunteerDocumentInformation.validation}', '${volunteerDocumentInformation.skills}', '${volunteerDocumentInformation.hours}', '${volunteerDocumentInformation.fileName}', '${volunteerDocumentInformation.extractText}', '${volunteerDocumentInformation.urlDoc}', '${volunteerDocumentInformation.userUuid}');`,
+           uuid(), '${volunteerDocumentInformation.eventName}', '${volunteerDocumentInformation.organization}', '${volunteerDocumentInformation.dateFrom}', '${volunteerDocumentInformation.dateTo}', '${volunteerDocumentInformation.role}', '${volunteerDocumentInformation.responsabilities}', '${volunteerDocumentInformation.validation}', '${volunteerDocumentInformation.skills}', ${volunteerDocumentInformation.hours}, '${volunteerDocumentInformation.fileName}', '${volunteerDocumentInformation.extractText}', '${volunteerDocumentInformation.urlDoc}', '${volunteerDocumentInformation.userUuid}');`,
         (dbErr, dbRes) => {
           if (dbErr) {
             return res
@@ -479,7 +636,6 @@ app.post(
       queryParams,
       (dbErr, dbRes) => {
         if (dbErr) {
-          xw
           return res.status(400).send({
             response: "Eroare în timpul citirii documentelor voluntarului!",
             error: dbErr,
@@ -803,7 +959,7 @@ app.post(
   body("gainerUuid").isLength({ min: 1 }),
   body("dateOfAppointment").isLength({ min: 1 }),
   body("status").isLength({ min: 1 }),
-  body("timeVolunteering"),
+  body("timeVolunteering").isNumeric(),
   (req, res) => {
     const errors = validationResult(req)
     if (!errors.isEmpty()) {
@@ -814,14 +970,20 @@ app.post(
         gainerUuid: req.body.gainerUuid,
         dateOfAppointment: req.body.dateOfAppointment,
         status: req.body.status,
-        timeVolunteering: req.body.timeVolunteering,
+        timeVolunteering: parseInt(req.body.timeVolunteering) || 0,
       }
 
       const bank_of_time = db
 
       bank_of_time.execute(
-        `INSERT INTO appointments ( userUuid, gainerUuid, dateOfAppointment, status, timeVolunteering) VALUES (
-      '${appointment.userUuid}','${appointment.gainerUuid}','${appointment.dateOfAppointment}' ,'${appointment.status}','${appointment.timeVolunteering}');`,
+        `INSERT INTO appointments (userUuid, gainerUuid, dateOfAppointment, status, timeVolunteering) VALUES (?, ?, ?, ?, ?)`,
+        [
+          appointment.userUuid,
+          appointment.gainerUuid,
+          appointment.dateOfAppointment,
+          appointment.status,
+          appointment.timeVolunteering,
+        ],
         (dbErr, dbRes) => {
           if (dbErr) {
             return res
